@@ -1,0 +1,122 @@
+#!/system/bin/sh
+set -u
+
+case "$0" in
+  */*) SCRIPT_DIR=${0%/*} ;;
+  *) SCRIPT_DIR=. ;;
+esac
+DIR=$(CDPATH= cd "$SCRIPT_DIR" && pwd) || exit 1
+DAEMON="$DIR/geektraced"
+CONFIG="$DIR/geektrace.conf"
+PIDFILE="$DIR/geektraced.pid"
+LOGFILE="$DIR/broker.log"
+
+fail() {
+  echo "geektrace: $*" >&2
+  exit 1
+}
+
+read_pid() {
+  [ -f "$PIDFILE" ] || return 1
+  IFS= read -r PID < "$PIDFILE" || return 1
+  case "$PID" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  return 0
+}
+
+is_running() {
+  read_pid || return 1
+  [ -r "/proc/$PID/cmdline" ] || return 1
+  CMDLINE=$(tr '\000' ' ' < "/proc/$PID/cmdline" 2>/dev/null)
+  case "$CMDLINE" in
+    *geektraced*) kill -0 "$PID" 2>/dev/null ;;
+    *) return 1 ;;
+  esac
+}
+
+require_root() {
+  [ "$(id -u)" = "0" ] || fail "run as root, for example: su -c '$0 $1'"
+}
+
+start() {
+  require_root start
+  [ -x "$DAEMON" ] || fail "missing executable: $DAEMON"
+  [ -f "$CONFIG" ] || fail "missing config: $CONFIG"
+  if is_running; then
+    echo "geektrace: already running (pid $PID)"
+    return 0
+  fi
+  rm -f "$PIDFILE"
+  : > "$LOGFILE"
+  nohup "$DAEMON" --config "$CONFIG" >> "$LOGFILE" 2>&1 &
+  NEW_PID=$!
+  echo "$NEW_PID" > "$PIDFILE"
+  sleep 1
+  if ! is_running; then
+    echo "geektrace: failed to start; see $LOGFILE" >&2
+    cat "$LOGFILE" >&2
+    rm -f "$PIDFILE"
+    return 1
+  fi
+  echo "geektrace: running (pid $PID), waiting for configured package"
+}
+
+stop() {
+  require_root stop
+  if ! is_running; then
+    rm -f "$PIDFILE"
+    echo "geektrace: not running"
+    return 0
+  fi
+  kill -TERM "$PID" || fail "cannot stop pid $PID"
+  COUNT=0
+  while is_running; do
+    COUNT=$((COUNT + 1))
+    if [ "$COUNT" -ge 10 ]; then
+      fail "pid $PID did not exit; do not SIGKILL it because uprobes need cleanup"
+    fi
+    sleep 1
+  done
+  rm -f "$PIDFILE"
+  echo "geektrace: stopped"
+}
+
+status() {
+  if is_running; then
+    echo "geektrace: running (pid $PID)"
+  else
+    rm -f "$PIDFILE"
+    echo "geektrace: not running"
+    return 1
+  fi
+}
+
+configured_package() {
+  PACKAGE=
+  while IFS='=' read -r KEY VALUE; do
+    KEY=$(echo "$KEY" | tr -d '[:space:]')
+    [ "$KEY" = "package" ] || continue
+    set -- $VALUE
+    PACKAGE=${1:-}
+    break
+  done < "$CONFIG"
+  case "$PACKAGE" in
+    ''|*[!A-Za-z0-9._]*) fail "invalid or missing package in $CONFIG" ;;
+  esac
+  echo "$PACKAGE"
+}
+
+case "${1:-}" in
+  start) start ;;
+  stop) stop ;;
+  status) status ;;
+  restart) stop && start ;;
+  launch)
+    PACKAGE=$(configured_package)
+    monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 \
+      || fail "cannot launch $PACKAGE"
+    echo "geektrace: launched $PACKAGE"
+    ;;
+  *) echo "usage: $0 {start|stop|status|restart|launch}" >&2; exit 2 ;;
+esac

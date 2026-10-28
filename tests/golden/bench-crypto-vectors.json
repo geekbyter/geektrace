@@ -1,0 +1,64 @@
+{
+  "schema": "geektrace.bench.vectors.v1",
+  "app": "com.geektrace.bench",
+  "note": "Deterministic inputs for external validation. Key material below is public NIST/bench data, not production secrets.",
+  "control_flow": {
+    "seeds": [0, 1, 2, 3, 4, 5, 6, 7],
+    "expected_results": [1515236178, 1515059229, 1515670226, 1515096355, 2397044, 4302469, 3011152, 5323407],
+    "note": "Seeds cover both if branches, all switch cases, and both indirect-call targets."
+  },
+  "fnv1a64": {
+    "input_ascii": "geektrace-bench",
+    "expected_hex": "978154e456c326bd"
+  },
+  "hashes": {
+    "sha1_abc": "a9993e364706816aba3e25717850c26c9cd0d89d",
+    "sha256_abc": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    "md5_abc": "900150983cd24fb0d6963f7d28e17f72",
+    "md4_abc": "a448017aaf21d8525fc10ae87aa6729d"
+  },
+  "hmac_sha256": {
+    "key_ascii": "key",
+    "message_ascii": "The quick brown fox jumps over the lazy dog",
+    "expected_hex": "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+  },
+  "aes_cbc_128": {
+    "key_hex": "2b7e151628aed2a6abf7158809cf4f3c",
+    "iv_hex": "000102030405060708090a0b0c0d0e0f",
+    "plaintext_hex": "6bc1bee22e409f96e93d7e117393172a",
+    "ciphertext_hex": "7649abac8119b246cee98e9b12e9197d",
+    "source": "NIST SP 800-38A F.2.1"
+  },
+  "aes_gcm_128": {
+    "key_hex": "00000000000000000000000000000000",
+    "iv_hex": "000000000000000000000000",
+    "plaintext_hex": "00000000000000000000000000000000",
+    "ciphertext_hex": "0388dace60b6a392f328c2b971b2fe78",
+    "tag_hex": "ab6e47d42cec13bdf53a67b21257bddf",
+    "source": "McGrew-Viega GCM test case 2"
+  },
+  "des_ecb": {
+    "key_hex": "133457799bbcdff1",
+    "plaintext_hex": "0123456789abcdef",
+    "ciphertext_hex": "85e813540f0ab405"
+  },
+  "files": {
+    "token_bin": {
+      "content_ascii": "geektrace-bench-token-v1",
+      "bytes": 24,
+      "sha256": "86672da495693335daabfe27441a779e83e37b79afe98cf2e0c0e45f29013bc1"
+    },
+    "final_bin": {
+      "content_ascii": "geektrace-bench-payload-v1",
+      "bytes": 26,
+      "sha256": "6f58bfe5f1eaf9bd7fef81ee2ed602fbca75031079ce628948bbb1fd2e60b464",
+      "flow": "cache/stage.bin -> rename -> cache/final.bin"
+    }
+  },
+  "nondeterministic": [
+    "rsa-2048 keypair and OAEP ciphertext",
+    "ecdsa p-256 keypair and DER signature",
+    "tls loopback protocol/cipher/session",
+    "detection values (installed-app count, settings, maps contents)"
+  ]
+}
